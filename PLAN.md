@@ -36,7 +36,7 @@ Before implementation, we need to decide on a few approaches:
 | **LLM-based matching** | Smart, context-aware | Requires API costs |
 | **Hybrid scoring** | Balanced | More complex |
 
-**Recommendation**: Keyword-based matching with resume skill extraction. LLM matching can be added later as an optional enhancement.
+**Recommendation**: Hybrid approach - keyword matching for initial filtering, then Claude API for intelligent job-resume fit scoring and custom question answering.
 
 ---
 
@@ -109,15 +109,16 @@ job_hunter/
 
 ### Phase 4: Intelligent Matching
 - [ ] Keyword extraction from resume (skills, experience, titles)
-- [ ] Resume-to-job fit scoring (0-100) based on keyword overlap
+- [ ] Initial filtering based on keywords and criteria
+- [ ] Claude API integration for deep job-resume fit scoring (0-100)
 - [ ] Company size/stage filtering (proxy for seed/Series A)
 - [ ] Location-based filtering (exclude Israel-based companies)
+- [ ] Match reasoning/explanation from LLM
 - [ ] Automatic filtering based on score threshold
-- [ ] Optional: LLM matching enhancement (future)
 
 ### Phase 5: Application Engine
 - [ ] Easy Apply form automation
-- [ ] Custom question handling (template-based with user-defined answers)
+- [ ] LLM-powered custom question answering (based on resume context)
 - [ ] Application tracking and logging
 - [ ] Rate limiting and human-like delays
 
@@ -188,7 +189,7 @@ search_criteria:
 |-----------|------------|
 | Language | Python 3.11+ |
 | Browser Automation | Playwright |
-| Job Matching | Keyword-based scoring (LLM optional) |
+| LLM Integration | Anthropic Claude API |
 | Database | SQLite |
 | PDF Parsing | pdfplumber |
 | Config | PyYAML |
@@ -201,14 +202,13 @@ search_criteria:
 
 ```txt
 playwright>=1.40.0
+anthropic>=0.18.0
 pdfplumber>=0.10.0
 pyyaml>=6.0
 pydantic>=2.0
 typer>=0.9.0
 rich>=13.0.0
 sqlite-utils>=3.35
-# Optional for LLM matching (future enhancement)
-# anthropic>=0.18.0
 ```
 
 ---
@@ -244,7 +244,7 @@ sqlite-utils>=3.35
 | **Experience Level** | Mid to Senior |
 | **Exclusions** | Israel-based companies |
 | **Resume** | PDF ready |
-| **LLM Matching** | Not enabled (keyword-based instead) |
+| **LLM Matching** | Enabled (Claude API) |
 
 ---
 
@@ -255,8 +255,8 @@ sqlite-utils>=3.35
 3. Build database models
 4. Create resume parser
 5. Implement LinkedIn browser automation
-6. Add keyword-based job matching
-7. Build application engine
+6. Add LLM-powered job matching (Claude API)
+7. Build application engine with smart question answering
 8. Add CLI interface
 9. Write tests
 10. Documentation
