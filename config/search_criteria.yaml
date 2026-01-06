@@ -1,0 +1,68 @@
+# LinkedIn Job Search Criteria
+# Customize these settings to match your job search preferences
+
+# Target job titles to search for
+titles:
+  - "Chief of Staff"
+  - "Business Operations"
+  - "BizOps"
+  - "Head of Business Operations"
+  - "Director of Operations"
+  - "Operations Manager"
+
+# Locations to search (can include cities, regions, or "Remote")
+locations:
+  - "New York, NY"
+  - "New York City Metropolitan Area"
+  - "Palo Alto, CA"
+  - "San Francisco Bay Area"
+  - "Remote"
+
+# Experience levels to target
+experience_levels:
+  - "Mid-Senior level"
+  - "Senior level"
+
+# Job types
+job_types:
+  - "Full-time"
+
+# Company sizes (proxy for startup stage)
+# These ranges help target seed to Series A companies
+company_sizes:
+  - "1-10 employees"      # Seed stage
+  - "11-50 employees"     # Seed/Series A
+  - "51-200 employees"    # Series A/B
+
+# How recently the job was posted
+date_posted: "Past week"  # Options: "Past 24 hours", "Past week", "Past month"
+
+# Only show jobs with Easy Apply
+easy_apply_only: true
+
+# Locations to exclude (e.g., specific countries or cities)
+excluded_locations:
+  - "Israel"
+
+# Companies to exclude (exact or partial matches)
+excluded_companies: []
+  # - "CompanyName Inc"
+
+# Minimum match score required to apply (0-100)
+# Jobs scoring below this threshold will not be applied to
+min_match_score: 60.0
+
+# Required keywords (job must contain ALL of these)
+keywords_required: []
+  # - "startup"
+  # - "operations"
+
+# Excluded keywords (job must contain NONE of these)
+keywords_excluded: []
+  # - "senior software engineer"
+  # - "data scientist"
+
+# Rate limiting and safety settings
+max_applications_per_day: 25  # Maximum applications to submit per day
+min_delay_between_actions: 30  # Minimum seconds between actions
+max_delay_between_actions: 90  # Maximum seconds between actions

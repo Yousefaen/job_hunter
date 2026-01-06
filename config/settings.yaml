@@ -1,0 +1,24 @@
+# Job Hunter Application Settings
+# Note: For sensitive data like API keys and passwords, use .env file instead
+# This file is for non-sensitive configuration only
+
+# Database configuration
+database_path: data/job_hunter.db
+resume_dir: data/resumes
+
+# Logging configuration
+log_level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+# log_file: logs/job_hunter.log  # Uncomment to enable file logging
+
+# Browser automation settings
+headless: false  # Set to true to run browser in background (no UI)
+browser_timeout: 30000  # Timeout in milliseconds (30 seconds)
+
+# Safety features
+rate_limit_enabled: true  # Enable rate limiting to avoid detection
+dry_run: false  # Set to true to preview actions without applying
+
+# Note: Required environment variables (set in .env file):
+# - ANTHROPIC_API_KEY: Your Claude API key
+# - LINKEDIN_EMAIL: Your LinkedIn email
+# - LINKEDIN_PASSWORD: Your LinkedIn password
