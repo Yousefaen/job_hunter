@@ -1,7 +1,6 @@
 """Search criteria model for LinkedIn job search configuration."""
 
-from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class SearchCriteria(BaseModel):
@@ -113,9 +112,8 @@ class SearchCriteria(BaseModel):
         description="Maximum delay between actions in seconds"
     )
 
-    class Config:
-        """Pydantic model configuration."""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "titles": [
                     "Chief of Staff",
@@ -149,6 +147,17 @@ class SearchCriteria(BaseModel):
                 "max_delay_between_actions": 90
             }
         }
+    )
+
+    @model_validator(mode="after")
+    def validate_delays(self) -> "SearchCriteria":
+        """Ensure min_delay is less than max_delay."""
+        if self.min_delay_between_actions >= self.max_delay_between_actions:
+            raise ValueError(
+                f"min_delay_between_actions ({self.min_delay_between_actions}) "
+                f"must be less than max_delay_between_actions ({self.max_delay_between_actions})"
+            )
+        return self
 
     def should_exclude_location(self, location: str) -> bool:
         """

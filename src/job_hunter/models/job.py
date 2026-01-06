@@ -1,8 +1,13 @@
 """Job posting model for LinkedIn job listings."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 
 class Job(BaseModel):
@@ -53,12 +58,11 @@ class Job(BaseModel):
     keywords: list[str] = Field(default_factory=list, description="Extracted keywords")
 
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
 
-    class Config:
-        """Pydantic model configuration."""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "job_id": "3789456123",
                 "title": "Chief of Staff",
@@ -76,6 +80,7 @@ class Job(BaseModel):
                 "keywords": ["chief of staff", "business operations", "startup"],
             }
         }
+    )
 
     def is_seed_to_series_a(self) -> bool:
         """

@@ -7,10 +7,8 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.table import Table
-from rich import print as rprint
 
-from job_hunter.config import get_config, reset_config
-from job_hunter.models import ApplicationStatus
+from job_hunter.config import get_config
 from job_hunter.storage import Database
 
 # Create Typer app
@@ -190,8 +188,8 @@ def status(
             table.add_column("Status", style="cyan")
             table.add_column("Count", justify="right", style="green")
 
-            for status, count in apps_by_status.items():
-                table.add_row(status, str(count))
+            for app_status, count in apps_by_status.items():
+                table.add_row(app_status, str(count))
 
             console.print(table)
         else:
@@ -231,7 +229,7 @@ def status(
         raise typer.Exit(1)
 
 
-@app.command()
+@app.command(name="config")
 def config_cmd(
     show: bool = typer.Option(
         True,

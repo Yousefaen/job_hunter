@@ -2,12 +2,26 @@
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from job_hunter.models import Application, ApplicationStatus, Job
 from job_hunter.storage.schemas import initialize_database
+
+# Allowed ORDER BY clauses to prevent SQL injection
+ALLOWED_ORDER_BY = frozenset({
+    "created_at DESC",
+    "created_at ASC",
+    "updated_at DESC",
+    "updated_at ASC",
+    "match_score DESC",
+    "match_score ASC",
+    "company ASC",
+    "company DESC",
+    "title ASC",
+    "title DESC",
+})
 
 
 class Database:
@@ -117,18 +131,30 @@ class Database:
         Args:
             limit: Maximum number of jobs to return
             offset: Number of jobs to skip
-            order_by: SQL ORDER BY clause
+            order_by: SQL ORDER BY clause (must be in ALLOWED_ORDER_BY)
 
         Returns:
             List of Job objects
+
+        Raises:
+            ValueError: If order_by is not in allowed list
         """
+        # Validate order_by to prevent SQL injection
+        if order_by not in ALLOWED_ORDER_BY:
+            raise ValueError(
+                f"Invalid order_by value: '{order_by}'. "
+                f"Allowed values: {', '.join(sorted(ALLOWED_ORDER_BY))}"
+            )
+
         cursor = self.conn.cursor()
+        params: list = []
 
         query = f"SELECT * FROM jobs ORDER BY {order_by}"
-        if limit:
-            query += f" LIMIT {limit} OFFSET {offset}"
+        if limit is not None:
+            query += " LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
 
-        cursor.execute(query)
+        cursor.execute(query, params)
         rows = cursor.fetchall()
 
         return [self._row_to_job(row) for row in rows]
@@ -318,16 +344,17 @@ class Database:
             List of Application objects
         """
         cursor = self.conn.cursor()
+        params: list = []
 
         if status:
             query = "SELECT * FROM applications WHERE status = ? ORDER BY updated_at DESC"
-            params = (status.value,)
+            params.append(status.value)
         else:
             query = "SELECT * FROM applications ORDER BY updated_at DESC"
-            params = ()
 
-        if limit:
-            query += f" LIMIT {limit}"
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
 
         cursor.execute(query, params)
         rows = cursor.fetchall()
@@ -342,7 +369,7 @@ class Database:
             Number of applications submitted today
         """
         cursor = self.conn.cursor()
-        today = datetime.utcnow().date().isoformat()
+        today = datetime.now(timezone.utc).date().isoformat()
 
         cursor.execute(
             """

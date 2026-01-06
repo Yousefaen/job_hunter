@@ -1,9 +1,14 @@
 """Application record model for tracking job applications."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 
 class ApplicationStatus(str, Enum):
@@ -52,7 +57,7 @@ class Application(BaseModel):
         description="When application was submitted"
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=_utc_now,
         description="Last status update"
     )
 
@@ -80,9 +85,8 @@ class Application(BaseModel):
         description="Reminder date for follow-up"
     )
 
-    class Config:
-        """Pydantic model configuration."""
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "application_id": "app_123456",
                 "job_id": "3789456123",
@@ -102,12 +106,13 @@ class Application(BaseModel):
                 "follow_up_date": "2024-01-22T00:00:00Z"
             }
         }
+    )
 
     def mark_as_submitted(self) -> None:
         """Mark application as successfully submitted."""
         self.status = ApplicationStatus.SUBMITTED
-        self.applied_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.applied_at = _utc_now()
+        self.updated_at = _utc_now()
         self.error_message = None
 
     def mark_as_failed(self, error: str) -> None:
@@ -118,7 +123,7 @@ class Application(BaseModel):
             error: Error message describing why application failed
         """
         self.status = ApplicationStatus.FAILED
-        self.updated_at = datetime.utcnow()
+        self.updated_at = _utc_now()
         self.error_message = error
 
     def update_status(self, new_status: ApplicationStatus, notes: str = "") -> None:
@@ -130,9 +135,10 @@ class Application(BaseModel):
             notes: Optional notes about the status change
         """
         self.status = new_status
-        self.updated_at = datetime.utcnow()
+        self.updated_at = _utc_now()
         if notes:
-            self.notes = f"{self.notes}\n{notes}".strip()
+            existing = self.notes.strip()
+            self.notes = f"{existing}\n{notes}".strip() if existing else notes
 
     def add_custom_qa(self, question_id: str, question: str, answer: str) -> None:
         """

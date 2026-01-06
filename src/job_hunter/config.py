@@ -1,11 +1,10 @@
 """Configuration management for job hunter application."""
 
-import os
 from pathlib import Path
 from typing import Optional
 
 import yaml
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from job_hunter.models import SearchCriteria
@@ -16,6 +15,7 @@ class Settings(BaseSettings):
     Application settings loaded from environment variables and config files.
 
     Environment variables take precedence over config file values.
+    Sensitive fields use SecretStr to prevent accidental logging.
     """
 
     model_config = SettingsConfigDict(
@@ -25,10 +25,10 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    # API Keys and Credentials
-    anthropic_api_key: str = Field(..., description="Anthropic API key for Claude")
+    # API Keys and Credentials (using SecretStr for security)
+    anthropic_api_key: SecretStr = Field(..., description="Anthropic API key for Claude")
     linkedin_email: str = Field(..., description="LinkedIn account email")
-    linkedin_password: str = Field(..., description="LinkedIn account password")
+    linkedin_password: SecretStr = Field(..., description="LinkedIn account password")
 
     # Paths
     database_path: Path = Field(
@@ -118,7 +118,7 @@ class Config:
             # Load from YAML if exists
             yaml_config = {}
             if settings_path.exists():
-                with open(settings_path, "r") as f:
+                with open(settings_path, "r", encoding="utf-8") as f:
                     yaml_config = yaml.safe_load(f) or {}
 
             # Environment variables override YAML
@@ -146,7 +146,7 @@ class Config:
                     "Please create config/search_criteria.yaml with your search parameters."
                 )
 
-            with open(criteria_path, "r") as f:
+            with open(criteria_path, "r", encoding="utf-8") as f:
                 criteria_data = yaml.safe_load(f)
 
             self._search_criteria = SearchCriteria(**criteria_data)
@@ -163,8 +163,8 @@ class Config:
         criteria_path = self.config_dir / "search_criteria.yaml"
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
-        with open(criteria_path, "w") as f:
-            yaml.dump(criteria.model_dump(), f, default_flow_style=False, sort_keys=False)
+        with open(criteria_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(criteria.model_dump(), f, default_flow_style=False, sort_keys=False)
 
         self._search_criteria = criteria
 
