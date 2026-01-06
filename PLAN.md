@@ -32,11 +32,11 @@ Before implementation, we need to decide on a few approaches:
 
 | Approach | Pros | Cons |
 |----------|------|------|
-| **Keyword matching** | Simple, fast | May miss relevant jobs |
+| **Keyword matching** | Simple, fast, no API costs | May miss relevant jobs |
 | **LLM-based matching** | Smart, context-aware | Requires API costs |
 | **Hybrid scoring** | Balanced | More complex |
 
-**Recommendation**: LLM-based matching using Claude API for intelligent job-resume fit scoring.
+**Recommendation**: Keyword-based matching with resume skill extraction. LLM matching can be added later as an optional enhancement.
 
 ---
 
@@ -108,14 +108,16 @@ job_hunter/
 - [ ] Easy Apply form detection and filling
 
 ### Phase 4: Intelligent Matching
-- [ ] Claude API integration for job matching
-- [ ] Resume-to-job fit scoring (0-100)
+- [ ] Keyword extraction from resume (skills, experience, titles)
+- [ ] Resume-to-job fit scoring (0-100) based on keyword overlap
+- [ ] Company size/stage filtering (proxy for seed/Series A)
+- [ ] Location-based filtering (exclude Israel-based companies)
 - [ ] Automatic filtering based on score threshold
-- [ ] Match reasoning/explanation
+- [ ] Optional: LLM matching enhancement (future)
 
 ### Phase 5: Application Engine
 - [ ] Easy Apply form automation
-- [ ] Custom question handling (using LLM)
+- [ ] Custom question handling (template-based with user-defined answers)
 - [ ] Application tracking and logging
 - [ ] Rate limiting and human-like delays
 
@@ -130,27 +132,41 @@ job_hunter/
 
 ## Core Features
 
-### Job Search Criteria
+### Job Search Criteria (Your Preferences)
 ```yaml
 search_criteria:
   titles:
-    - "Software Engineer"
-    - "Backend Developer"
-    - "Full Stack Developer"
+    - "Chief of Staff"
+    - "Business Operations"
+    - "BizOps"
+    - "Head of Business Operations"
+    - "Director of Operations"
   locations:
-    - "San Francisco, CA"
+    - "New York, NY"
+    - "New York City Metropolitan Area"
+    - "Palo Alto, CA"
+    - "San Francisco Bay Area"
     - "Remote"
   experience_level:
     - "Mid-Senior level"
     - "Senior level"
   job_type:
     - "Full-time"
+  company_size:
+    - "1-10 employees"      # Seed stage proxy
+    - "11-50 employees"     # Seed/Series A proxy
+    - "51-200 employees"    # Series A/B proxy
   date_posted: "Past week"
   easy_apply_only: true
-  excluded_companies:
-    - "Company I don't want"
-  min_match_score: 70
+  excluded_locations:
+    - "Israel"              # Exclude Israel-based companies
+  min_match_score: 60
 ```
+
+### Target Company Profile
+- **Stage**: Seed to Series A startups
+- **Size**: 1-200 employees (as proxy for early stage)
+- **Exclusions**: Israel-based companies
 
 ### Application Tracking
 - Jobs found, matched, applied, rejected, interviewed
@@ -172,11 +188,11 @@ search_criteria:
 |-----------|------------|
 | Language | Python 3.11+ |
 | Browser Automation | Playwright |
-| LLM Integration | Anthropic Claude API |
+| Job Matching | Keyword-based scoring (LLM optional) |
 | Database | SQLite |
 | PDF Parsing | pdfplumber |
 | Config | PyYAML |
-| CLI | Click or Typer |
+| CLI | Typer |
 | Testing | pytest |
 
 ---
@@ -185,13 +201,14 @@ search_criteria:
 
 ```txt
 playwright>=1.40.0
-anthropic>=0.18.0
 pdfplumber>=0.10.0
 pyyaml>=6.0
 pydantic>=2.0
 typer>=0.9.0
 rich>=13.0.0
 sqlite-utils>=3.35
+# Optional for LLM matching (future enhancement)
+# anthropic>=0.18.0
 ```
 
 ---
@@ -217,34 +234,29 @@ sqlite-utils>=3.35
 
 ---
 
-## Questions for You
+## Your Profile Summary
 
-1. **Primary job titles** you're targeting?
-2. **Preferred locations** (including remote)?
-3. **Experience level** range?
-4. **Any companies to exclude** from applications?
-5. **Do you have a resume PDF** ready, or should we start with a JSON profile?
-6. **Do you have a Claude API key** for the matching feature?
+| Setting | Value |
+|---------|-------|
+| **Target Roles** | Chief of Staff, BizOps at early-stage startups |
+| **Company Stage** | Seed to Series A |
+| **Locations** | New York, Palo Alto/Bay Area, Remote |
+| **Experience Level** | Mid to Senior |
+| **Exclusions** | Israel-based companies |
+| **Resume** | PDF ready |
+| **LLM Matching** | Not enabled (keyword-based instead) |
 
 ---
 
-## Next Steps (After Approval)
+## Next Steps (Ready to Implement)
 
 1. Set up project structure and dependencies
 2. Implement configuration system
 3. Build database models
 4. Create resume parser
 5. Implement LinkedIn browser automation
-6. Add job matching with Claude
+6. Add keyword-based job matching
 7. Build application engine
 8. Add CLI interface
 9. Write tests
 10. Documentation
-
----
-
-**Ready to proceed?** Let me know if you'd like to:
-- Modify the architecture
-- Change the technical approach
-- Adjust any features
-- Start implementation immediately
