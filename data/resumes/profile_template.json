@@ -1,0 +1,91 @@
+{
+  "contact": {
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "phone": "+1 (555) 123-4567",
+    "location": "New York, NY",
+    "linkedin_url": "https://linkedin.com/in/johndoe",
+    "website": "https://johndoe.com"
+  },
+  "summary": "Experienced Chief of Staff and Business Operations leader with 8+ years driving strategic initiatives at early-stage startups. Proven track record of scaling operations, building cross-functional teams, and executing high-impact projects from 0 to 1. Strong background in business strategy, data analytics, and operational excellence.",
+  "skills": [
+    "Strategic Planning",
+    "Business Operations",
+    "Cross-functional Leadership",
+    "Data Analysis",
+    "Project Management",
+    "Financial Modeling",
+    "Process Optimization",
+    "Stakeholder Management",
+    "OKRs & KPIs",
+    "Product Strategy",
+    "Python",
+    "SQL",
+    "Excel/Google Sheets",
+    "Tableau"
+  ],
+  "work_experience": [
+    {
+      "company": "TechStartup Inc.",
+      "title": "Chief of Staff",
+      "location": "New York, NY",
+      "start_date": "Jan 2021",
+      "end_date": "Present",
+      "description": "Lead strategic initiatives and cross-functional operations for Series A SaaS startup.",
+      "achievements": [
+        "Built and scaled operations function from 0 to 1, supporting company growth from 20 to 100 employees",
+        "Led company-wide OKR process and quarterly business reviews, improving execution visibility by 40%",
+        "Managed strategic projects including office expansion, hiring process redesign, and product launch coordination",
+        "Partnered with CEO on fundraising efforts, contributing to successful $15M Series A round"
+      ]
+    },
+    {
+      "company": "GrowthCo",
+      "title": "Business Operations Manager",
+      "location": "San Francisco, CA",
+      "start_date": "Jun 2018",
+      "end_date": "Dec 2020",
+      "description": "Drove operational excellence and data-driven decision making at seed-stage fintech startup.",
+      "achievements": [
+        "Established analytics infrastructure and reporting dashboards, enabling data-driven decisions across org",
+        "Optimized sales operations workflow, reducing customer acquisition cost by 25%",
+        "Led annual planning process and budget management for $5M operating budget",
+        "Coordinated product launches and go-to-market strategies with product and marketing teams"
+      ]
+    },
+    {
+      "company": "Consulting Firm LLC",
+      "title": "Strategy Analyst",
+      "location": "Boston, MA",
+      "start_date": "Jul 2016",
+      "end_date": "May 2018",
+      "description": "Supported Fortune 500 clients on strategic initiatives and operational transformations.",
+      "achievements": [
+        "Conducted market research and competitive analysis for client engagements across tech and healthcare",
+        "Built financial models and business cases supporting $100M+ investment decisions",
+        "Led workstream on operational efficiency project, identifying $10M in cost savings opportunities"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "institution": "Stanford University",
+      "degree": "Bachelor of Science",
+      "field": "Economics",
+      "graduation_date": "2016",
+      "gpa": "3.8",
+      "honors": [
+        "Summa Cum Laude",
+        "Phi Beta Kappa"
+      ]
+    }
+  ],
+  "certifications": [
+    "Six Sigma Green Belt",
+    "Product Management Certificate (General Assembly)"
+  ],
+  "languages": [
+    "English (Native)",
+    "Spanish (Professional)"
+  ]
+}
