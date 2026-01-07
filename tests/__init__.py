@@ -1,1 +1,1 @@
-"""Tests for the LinkedIn Job Application Agent."""
+"""Test suite for job hunter application."""

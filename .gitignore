@@ -1,3 +1,7 @@
+# Environment variables
+.env
+.env.local
+
 # Python
 __pycache__/
 *.py[cod]
@@ -39,21 +43,26 @@ ENV/
 htmlcov/
 .tox/
 
-# Environment variables
-.env
-.env.local
-
 # Data
 data/resumes/*.pdf
 data/resumes/*.json
 !data/resumes/profile_template.json
 !data/resumes/README.md
+
+# Databases
 *.db
 *.db-journal
+*.sqlite
+*.sqlite3
+data/job_hunter.db
 
 # Logs
 *.log
+logs/
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Playwright
+playwright/.auth/
