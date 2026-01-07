@@ -30,7 +30,7 @@ env/
 ENV/
 .venv
 
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
@@ -43,18 +43,18 @@ ENV/
 htmlcov/
 .tox/
 
-# Data
-data/resumes/*.pdf
-data/resumes/*.json
-!data/resumes/profile_template.json
-!data/resumes/README.md
-
-# Databases
+# Database
 *.db
 *.db-journal
 *.sqlite
 *.sqlite3
 data/job_hunter.db
+
+# Resumes (user data)
+data/resumes/*.pdf
+data/resumes/*.json
+!data/resumes/profile_template.json
+!data/resumes/README.md
 
 # Logs
 *.log
@@ -66,3 +66,9 @@ Thumbs.db
 
 # Playwright
 playwright/.auth/
+.playwright/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json

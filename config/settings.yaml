@@ -1,16 +1,25 @@
-# Job Hunter Settings
-# Copy this file to settings.yaml and customize as needed
+# Job Hunter Application Settings
+# Note: For sensitive data like API keys and passwords, use .env file instead
 
-# Resume path (PDF or JSON profile)
+# Resume configuration
 # resume_path: data/resumes/my_resume.pdf
 
-# Database path (default: data/job_hunter.db)
-# database_path: data/job_hunter.db
+# Database configuration
+database_path: data/job_hunter.db
+resume_dir: data/resumes
 
-# Browser settings
-headless_browser: false  # Set to true for background operation
-dry_run: false           # Set to true to simulate without applying
-verbose: false           # Set to true for detailed logging
+# Logging configuration
+log_level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+# log_file: logs/job_hunter.log  # Uncomment to enable file logging
+
+# Browser automation settings
+headless: false  # Set to true to run browser in background (no UI)
+browser_timeout: 30000  # Timeout in milliseconds (30 seconds)
+
+# Safety features
+rate_limit_enabled: true  # Enable rate limiting to avoid detection
+dry_run: false  # Set to true to preview actions without applying
+verbose: false  # Enable verbose logging
 
 # Rate limiting (to avoid detection)
 rate_limits:
@@ -19,9 +28,7 @@ rate_limits:
   max_applications_per_day: 25
   max_searches_per_hour: 10
 
-# API keys and credentials should be set via environment variables:
+# Note: Required environment variables (set in .env file):
 # - ANTHROPIC_API_KEY: Your Claude API key
 # - LINKEDIN_EMAIL: Your LinkedIn email
 # - LINKEDIN_PASSWORD: Your LinkedIn password
-#
-# You can set these in a .env file (never commit this file!)
