@@ -1,0 +1,27 @@
+# Job Hunter Settings
+# Copy this file to settings.yaml and customize as needed
+
+# Resume path (PDF or JSON profile)
+# resume_path: data/resumes/my_resume.pdf
+
+# Database path (default: data/job_hunter.db)
+# database_path: data/job_hunter.db
+
+# Browser settings
+headless_browser: false  # Set to true for background operation
+dry_run: false           # Set to true to simulate without applying
+verbose: false           # Set to true for detailed logging
+
+# Rate limiting (to avoid detection)
+rate_limits:
+  min_delay_seconds: 30
+  max_delay_seconds: 90
+  max_applications_per_day: 25
+  max_searches_per_hour: 10
+
+# API keys and credentials should be set via environment variables:
+# - ANTHROPIC_API_KEY: Your Claude API key
+# - LINKEDIN_EMAIL: Your LinkedIn email
+# - LINKEDIN_PASSWORD: Your LinkedIn password
+#
+# You can set these in a .env file (never commit this file!)

@@ -1,0 +1,39 @@
+# Job Search Criteria Configuration
+# Customize these settings to match your job search preferences
+
+# Target job titles to search for
+target_roles:
+  - "Chief of Staff"
+  - "Business Operations"
+  - "BizOps"
+  - "Head of Business Operations"
+  - "Director of Operations"
+
+# Target locations (LinkedIn location filters)
+locations:
+  - "New York"
+  - "San Francisco Bay Area"
+  - "Palo Alto"
+  - "Remote"
+
+# Locations to exclude from results
+excluded_locations:
+  - "Israel"
+
+# Target experience levels
+experience_levels:
+  - "Mid-Senior level"
+  - "Director"
+
+# Target company sizes (proxy for startup stage: Seed to Series A)
+company_sizes:
+  - "1-10 employees"
+  - "11-50 employees"
+  - "51-200 employees"
+
+# Minimum match score (0-100) for job-resume fit
+# Jobs below this score will be skipped
+min_match_score: 60
+
+# Only apply to Easy Apply jobs
+easy_apply_only: true
