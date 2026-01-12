@@ -1,79 +1,53 @@
 """Application tracking data model."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
-from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
+from pydantic import BaseModel, ConfigDict, Field
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 
 class ApplicationStatus(str, Enum):
     """Status of a job application."""
 
-    QUEUED = "queued"
-    IN_PROGRESS = "in_progress"
+    PENDING = "pending"
     SUBMITTED = "submitted"
-    FAILED = "failed"
-    SKIPPED = "skipped"
-    VIEWED = "viewed"
     REJECTED = "rejected"
-    INTERVIEW = "interview"
+    INTERVIEWING = "interviewing"
+    OFFERED = "offered"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
 
 
 class Application(BaseModel):
-    """Job application record."""
+    """Model for tracking job applications."""
 
-    id: str = Field(..., description="Unique application identifier")
-    job_id: str = Field(..., description="Associated job ID")
-    job_title: str = Field(..., description="Job title for display")
-    company: str = Field(..., description="Company name")
+    id: Optional[str] = None
+    job_id: str  # Foreign key to Job
 
-    # Status tracking
-    status: ApplicationStatus = Field(
-        default=ApplicationStatus.QUEUED,
-        description="Current application status"
-    )
+    # Application details
+    status: ApplicationStatus = ApplicationStatus.PENDING
+    submitted_at: Optional[datetime] = None
 
-    # Match info
-    match_score: int = Field(default=0, description="Match score when applied")
+    # Form responses
+    custom_questions: Dict[str, str] = Field(default_factory=dict)
+    cover_letter: Optional[str] = None
+
+    # Tracking
+    follow_up_date: Optional[datetime] = None
+    notes: str = ""
+
+    # Interview tracking
+    interviews: list[Dict[str, Any]] = Field(default_factory=list)
 
     # Timestamps
-    created_at: datetime = Field(
-        default_factory=datetime.now,
-        description="When application was queued"
+    created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
+
+    model_config = ConfigDict(
+        ser_json_timedelta="iso8601",
     )
-    submitted_at: Optional[datetime] = Field(
-        None,
-        description="When application was submitted"
-    )
-    updated_at: datetime = Field(
-        default_factory=datetime.now,
-        description="Last status update"
-    )
-
-    # Additional info
-    notes: str = Field(default="", description="Notes about the application")
-    error_message: Optional[str] = Field(None, description="Error if failed")
-
-    # Custom questions answered
-    questions_answered: list[dict] = Field(
-        default_factory=list,
-        description="Custom questions and answers"
-    )
-
-    def mark_submitted(self) -> None:
-        """Mark application as submitted."""
-        self.status = ApplicationStatus.SUBMITTED
-        self.submitted_at = datetime.now()
-        self.updated_at = datetime.now()
-
-    def mark_failed(self, error: str) -> None:
-        """Mark application as failed."""
-        self.status = ApplicationStatus.FAILED
-        self.error_message = error
-        self.updated_at = datetime.now()
-
-    def mark_skipped(self, reason: str) -> None:
-        """Mark application as skipped."""
-        self.status = ApplicationStatus.SKIPPED
-        self.notes = reason
-        self.updated_at = datetime.now()

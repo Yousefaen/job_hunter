@@ -1,1 +1,1 @@
-"""Tests for browser automation module."""
+"""Test suite for job hunter application."""

@@ -1,3 +1,7 @@
+# Environment variables
+.env
+.env.local
+
 # Python
 __pycache__/
 *.py[cod]
@@ -24,43 +28,36 @@ wheels/
 venv/
 ENV/
 env/
-.venv/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
-.nox/
 
-# Environment
-.env
-.env.local
-*.env
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Session data (contains sensitive cookies)
-data/sessions/
-*.cookies.json
-
-# Screenshots (debug output)
-data/screenshots/
-
-# Database
+# Databases
 *.db
 *.sqlite
 *.sqlite3
+data/job_hunter.db
+
+# Resumes (may contain sensitive info)
+data/resumes/*.pdf
 
 # Logs
 *.log
 logs/
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
+
+# Playwright
+playwright/.auth/

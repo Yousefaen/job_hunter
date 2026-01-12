@@ -1,106 +1,172 @@
-"""
-Pytest configuration and fixtures for browser tests.
-"""
+"""Pytest configuration and fixtures."""
+
+import os
+from datetime import date
 
 import pytest
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+
+from src.models.job import Job
+from src.models.search_criteria import SearchCriteria
+from src.resume.profile import UserProfile, Experience, Education
 
 
 @pytest.fixture
-def mock_page():
-    """Create a mock Playwright page."""
-    page = MagicMock()
-    page.url = "https://www.linkedin.com/feed/"
-    page.goto = AsyncMock()
-    page.wait_for_selector = AsyncMock()
-    page.query_selector = AsyncMock(return_value=None)
-    page.query_selector_all = AsyncMock(return_value=[])
-    page.keyboard = MagicMock()
-    page.keyboard.press = AsyncMock()
-    page.mouse = MagicMock()
-    page.mouse.move = AsyncMock()
-    page.mouse.click = AsyncMock()
-    page.mouse.wheel = AsyncMock()
-    page.screenshot = AsyncMock()
-    page.close = AsyncMock()
-    page.add_init_script = AsyncMock()
-    return page
-
-
-@pytest.fixture
-def mock_browser():
-    """Create a mock LinkedInBrowser."""
-    browser = MagicMock()
-    browser.random_delay = AsyncMock()
-    browser.goto = AsyncMock()
-    browser.human_type = AsyncMock()
-    browser.human_click = AsyncMock()
-    browser.scroll_page = AsyncMock()
-    browser.scroll_to_element = AsyncMock()
-    browser.wait_for_element = AsyncMock(return_value=True)
-    browser.element_exists = AsyncMock(return_value=False)
-    browser.get_text = AsyncMock(return_value="")
-    browser.get_attribute = AsyncMock(return_value="")
-    browser.take_screenshot = AsyncMock()
-    browser.new_page = AsyncMock()
-    browser.save_cookies = AsyncMock()
-    browser.load_cookies = AsyncMock(return_value=True)
-    browser.start = AsyncMock()
-    browser.close = AsyncMock()
-    return browser
-
-
-@pytest.fixture
-def temp_session_dir(tmp_path):
-    """Create a temporary session directory."""
-    session_dir = tmp_path / "sessions"
-    session_dir.mkdir()
-    return session_dir
-
-
-@pytest.fixture
-def sample_job_listing():
-    """Create a sample job listing for testing."""
-    from job_hunter.agent.job_searcher import JobListing
-
-    return JobListing(
-        job_id="3789456123",
-        title="Chief of Staff",
-        company="Acme Startup Inc",
+def sample_profile() -> UserProfile:
+    """Create a sample user profile for testing."""
+    return UserProfile(
+        full_name="Jane Doe",
+        email="jane.doe@example.com",
+        phone="+1-555-0100",
         location="New York, NY",
-        url="https://www.linkedin.com/jobs/view/3789456123",
-        easy_apply=True,
-        posted_date="2 days ago",
+        linkedin_url="https://linkedin.com/in/janedoe",
+        summary="Experienced business operations leader with 8+ years in scaling startups. "
+        "Expertise in strategic planning, cross-functional collaboration, and operational excellence.",
+        headline="Chief of Staff | Business Operations Leader",
+        skills=[
+            "Strategic Planning",
+            "Business Operations",
+            "Cross-functional Leadership",
+            "OKRs",
+            "Project Management",
+            "Data Analysis",
+        ],
+        technical_skills=[
+            "SQL",
+            "Python",
+            "Tableau",
+            "Salesforce",
+        ],
+        experiences=[
+            Experience(
+                company="TechStartup Inc",
+                title="Chief of Staff",
+                location="New York, NY",
+                start_date=date(2020, 1, 1),
+                current=True,
+                description="Led strategic initiatives and cross-functional operations for 50-person startup",
+                achievements=[
+                    "Implemented OKR framework across all departments",
+                    "Reduced operational costs by 30% through process optimization",
+                ],
+            ),
+            Experience(
+                company="GrowthCo",
+                title="Business Operations Manager",
+                location="San Francisco, CA",
+                start_date=date(2017, 6, 1),
+                end_date=date(2019, 12, 31),
+                description="Managed operations and analytics for Series A SaaS company",
+                achievements=[
+                    "Built data infrastructure supporting $10M ARR growth",
+                ],
+            ),
+        ],
+        education=[
+            Education(
+                institution="Stanford University",
+                degree="MBA",
+                field_of_study="Business Administration",
+                start_date=date(2015, 9, 1),
+                end_date=date(2017, 6, 1),
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def sample_criteria() -> SearchCriteria:
+    """Create sample search criteria."""
+    return SearchCriteria(
+        titles=[
+            "Chief of Staff",
+            "Business Operations",
+            "BizOps",
+        ],
+        locations=[
+            "New York, NY",
+            "San Francisco, CA",
+            "Remote",
+        ],
+        excluded_locations=["Israel"],
+        company_sizes=[
+            "1-10 employees",
+            "11-50 employees",
+            "51-200 employees",
+        ],
+        min_match_score=60,
+    )
+
+
+@pytest.fixture
+def good_match_job() -> Job:
+    """Create a job that should match well."""
+    return Job(
+        linkedin_job_id="12345",
+        title="Chief of Staff",
+        company="Awesome Startup",
+        location="New York, NY",
+        description="""
+        We're seeking a Chief of Staff to work directly with our CEO at our Seed-stage startup.
+
+        Responsibilities:
+        - Lead strategic planning and OKR implementation
+        - Coordinate cross-functional projects
+        - Drive operational excellence
+        - Support fundraising efforts
+
+        Requirements:
+        - 5+ years in business operations or Chief of Staff roles
+        - Experience at early-stage startups (Seed to Series A)
+        - Strong analytical and project management skills
+        - SQL and data analysis experience preferred
+
+        Our startup is a 30-person team building the future of B2B SaaS.
+        """,
         company_size="11-50 employees",
-        description="We're looking for a Chief of Staff to join our team...",
         experience_level="Mid-Senior level",
-        job_type="Full-time",
+        easy_apply=True,
     )
 
 
-# Pytest hooks for integration tests
-def pytest_configure(config):
-    """Register custom markers."""
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests (require browser)"
+@pytest.fixture
+def poor_match_job() -> Job:
+    """Create a job that should not match well."""
+    return Job(
+        linkedin_job_id="67890",
+        title="Software Engineer",
+        company="BigCorp",
+        location="Seattle, WA",
+        description="""
+        Looking for a Senior Software Engineer to work on backend systems.
+
+        Requirements:
+        - 10+ years of Java development
+        - Experience with distributed systems
+        - Deep knowledge of algorithms and data structures
+
+        We're a 5000-person enterprise software company.
+        """,
+        company_size="1001-5000 employees",
+        experience_level="Senior level",
+        easy_apply=False,
     )
 
 
-def pytest_collection_modifyitems(config, items):
-    """Skip integration tests unless --run-integration is passed."""
-    if not config.getoption("--run-integration", default=False):
-        skip_integration = pytest.mark.skip(reason="need --run-integration option to run")
-        for item in items:
-            if "integration" in item.keywords:
-                item.add_marker(skip_integration)
-
-
-def pytest_addoption(parser):
-    """Add custom command line options."""
-    parser.addoption(
-        "--run-integration",
-        action="store_true",
-        default=False,
-        help="run integration tests",
+@pytest.fixture
+def excluded_location_job() -> Job:
+    """Create a job in an excluded location."""
+    return Job(
+        linkedin_job_id="99999",
+        title="Chief of Staff",
+        company="Tech Co",
+        location="Tel Aviv, Israel",
+        description="Chief of Staff role at a growing startup.",
+        company_size="11-50 employees",
+        easy_apply=True,
     )
+
+
+@pytest.fixture
+def mock_api_key(monkeypatch) -> None:
+    """Mock API key environment variable."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key-12345")

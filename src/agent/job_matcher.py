@@ -4,21 +4,18 @@ import json
 import logging
 import os
 from typing import Optional
-
 from pydantic import BaseModel, Field
 
-try:
-    from anthropic import Anthropic, APIError, RateLimitError, AuthenticationError
-    ANTHROPIC_AVAILABLE = True
-except ImportError:
-    ANTHROPIC_AVAILABLE = False
+from anthropic import Anthropic, APIError, RateLimitError, AuthenticationError
 
-from ..models.job import Job, JobMatch
+from ..models.job import Job, JobStatus
 from ..models.search_criteria import SearchCriteria
 from ..resume.profile import UserProfile
 
 
+# Default model for scoring - can be overridden via configuration
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
+
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +36,7 @@ class JobMatcher:
     def __init__(
         self,
         profile: UserProfile,
-        criteria: Optional[SearchCriteria] = None,
+        criteria: SearchCriteria,
         api_key: Optional[str] = None,
         model: Optional[str] = None,
     ):
@@ -47,37 +44,26 @@ class JobMatcher:
 
         Args:
             profile: User's resume profile
-            criteria: Search criteria and matching thresholds (optional)
+            criteria: Search criteria and matching thresholds
             api_key: Anthropic API key (defaults to ANTHROPIC_API_KEY env var)
             model: Claude model to use (defaults to DEFAULT_MODEL)
         """
         self.profile = profile
-        self.criteria = criteria or SearchCriteria()
+        self.criteria = criteria
         self.model = model or DEFAULT_MODEL
-        self.client = None
 
-        if not ANTHROPIC_AVAILABLE:
-            logger.warning("Anthropic library not available. Install with: pip install anthropic")
-            return
-
+        # Get API key but don't store it as instance variable
         resolved_api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
 
         if not resolved_api_key:
-            logger.warning(
-                "Anthropic API key not set. Set ANTHROPIC_API_KEY environment variable "
-                "or pass api_key parameter."
+            raise ValueError(
+                "Anthropic API key required. Set ANTHROPIC_API_KEY environment variable."
             )
-            return
 
         self.client = Anthropic(api_key=resolved_api_key)
         self.profile_keywords = profile.get_keywords()
 
         logger.info(f"JobMatcher initialized with {len(self.profile_keywords)} keywords")
-
-    @property
-    def is_available(self) -> bool:
-        """Check if the matcher is properly configured."""
-        return self.client is not None
 
     def keyword_filter(self, job: Job) -> bool:
         """Fast keyword-based filtering before LLM scoring.
@@ -88,19 +74,13 @@ class JobMatcher:
         Returns:
             True if job passes keyword filter
         """
-        job_text = f"{job.title} {job.description or ''} {job.company}".lower()
+        job_text = f"{job.title} {job.description} {job.company}".lower()
 
         # Check excluded locations
-        if job.location:
-            for excluded_loc in self.criteria.excluded_locations:
-                if excluded_loc.lower() in job.location.lower():
-                    logger.debug(f"Filtered out {job.title} - excluded location: {excluded_loc}")
-                    return False
-
-        # Check excluded companies
-        if self.criteria.is_company_excluded(job.company):
-            logger.debug(f"Filtered out {job.title} - excluded company: {job.company}")
-            return False
+        for excluded_loc in self.criteria.excluded_locations:
+            if excluded_loc.lower() in job.location.lower():
+                logger.debug(f"Filtered out {job.title} - excluded location: {excluded_loc}")
+                return False
 
         # Check company size if available
         if job.company_size and self.criteria.company_sizes:
@@ -114,21 +94,31 @@ class JobMatcher:
                 logger.debug(f"Filtered out {job.title} - excluded keyword: {keyword}")
                 return False
 
+        # Check required keywords (if specified)
+        if self.criteria.required_keywords:
+            has_required = any(
+                keyword.lower() in job_text
+                for keyword in self.criteria.required_keywords
+            )
+            if not has_required:
+                logger.debug(f"Filtered out {job.title} - missing required keywords")
+                return False
+
         # Check for any profile keyword matches (basic relevance)
         keyword_matches = sum(
             1 for keyword in self.profile_keywords
-            if keyword.lower() in job_text
+            if keyword in job_text
         )
 
-        # Require at least 1 keyword match for relevance
-        if keyword_matches < 1:
+        # Require at least 2 keyword matches for relevance
+        if keyword_matches < 2:
             logger.debug(f"Filtered out {job.title} - insufficient keyword matches ({keyword_matches})")
             return False
 
         logger.debug(f"Passed keyword filter: {job.title} ({keyword_matches} matches)")
         return True
 
-    def score_job(self, job: Job) -> MatchResult:
+    def score_job_match(self, job: Job) -> MatchResult:
         """Score job-resume fit using Claude API.
 
         Args:
@@ -137,22 +127,17 @@ class JobMatcher:
         Returns:
             MatchResult with score and reasoning
         """
-        if not self.is_available:
-            return MatchResult(
-                score=0,
-                reasoning="API not configured - set ANTHROPIC_API_KEY",
-                is_match=False,
-            )
-
         logger.info(f"Scoring job match: {job.title} at {job.company}")
 
+        # Prepare prompt for Claude
         prompt = self._build_scoring_prompt(job)
 
         try:
+            # Call Claude API
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=1000,
-                temperature=0.3,
+                temperature=0.3,  # Lower temperature for consistent scoring
                 messages=[
                     {
                         "role": "user",
@@ -161,9 +146,13 @@ class JobMatcher:
                 ],
             )
 
+            # Parse response
             response_text = response.content[0].text
+
+            # Extract JSON from response
             match_data = self._parse_scoring_response(response_text)
 
+            # Create MatchResult
             result = MatchResult(
                 score=match_data.get("score", 0),
                 reasoning=match_data.get("reasoning", ""),
@@ -181,13 +170,10 @@ class JobMatcher:
 
         except AuthenticationError as e:
             logger.error(f"Authentication error - check API key: {e}")
-            return MatchResult(
-                score=0,
-                reasoning="Authentication error - check your API key",
-                is_match=False,
-            )
+            raise  # Re-raise auth errors - they're not recoverable
         except RateLimitError as e:
             logger.warning(f"Rate limit hit for job {job.title}: {e}")
+            # Return low score but don't raise - caller can retry later
             return MatchResult(
                 score=0,
                 reasoning="Rate limit hit - please retry later",
@@ -209,39 +195,16 @@ class JobMatcher:
                 is_match=False,
             )
 
-    def match_job(self, job: Job) -> JobMatch:
-        """Complete matching pipeline for a job.
+    def _build_scoring_prompt(self, job: Job) -> str:
+        """Build prompt for job scoring.
 
         Args:
-            job: Job to match
+            job: Job to score
 
         Returns:
-            JobMatch with score and justification
+            Formatted prompt
         """
-        # Step 1: Keyword filter
-        if not self.keyword_filter(job):
-            return JobMatch(
-                job=job,
-                score=0,
-                justification="Filtered out by keyword matching",
-                matched_skills=[],
-                concerns=["Did not pass initial keyword filter"],
-            )
-
-        # Step 2: LLM scoring
-        result = self.score_job(job)
-
-        return JobMatch(
-            job=job,
-            score=result.score,
-            justification=result.reasoning,
-            matched_skills=result.key_matches,
-            concerns=result.concerns,
-        )
-
-    def _build_scoring_prompt(self, job: Job) -> str:
-        """Build prompt for job scoring."""
-        profile_summary = self.profile.to_text_summary()
+        profile_summary = self.profile.get_summary_text()
 
         prompt = f"""You are a career matching expert. Score how well this candidate fits this job posting on a scale of 0-100.
 
@@ -256,13 +219,13 @@ Location: {job.location}
 {f'Experience Level: {job.experience_level}' if job.experience_level else ''}
 
 Description:
-{job.description or 'No description available'}
+{job.description}
 
 SCORING CRITERIA:
-- Role alignment: Does this match the candidate's target roles and experience?
+- Role alignment: Does this match Chief of Staff / BizOps / Business Operations focus?
 - Skills match: How well do candidate's skills align with job requirements?
-- Experience fit: Is the experience level appropriate?
-- Company stage fit: Does company size/stage match preferences?
+- Experience fit: Is the experience level appropriate (mid to senior)?
+- Company stage fit: Is this likely a Seed to Series A startup (based on company size and description)?
 - Location fit: Does location match candidate preferences?
 
 Return your analysis as JSON with this structure:
@@ -278,8 +241,16 @@ Be honest and rigorous in your scoring. A score of 60+ indicates a good match wo
         return prompt
 
     def _parse_scoring_response(self, response_text: str) -> dict:
-        """Parse Claude's scoring response."""
+        """Parse Claude's scoring response.
+
+        Args:
+            response_text: Raw response from Claude
+
+        Returns:
+            Parsed JSON data
+        """
         try:
+            # Try to find JSON in the response
             start_idx = response_text.find("{")
             end_idx = response_text.rfind("}") + 1
 
@@ -289,9 +260,11 @@ Be honest and rigorous in your scoring. A score of 60+ indicates a good match wo
             json_str = response_text[start_idx:end_idx]
             data = json.loads(json_str)
 
+            # Validate required fields
             if "score" not in data:
                 raise ValueError("Missing 'score' field in response")
 
+            # Ensure score is in valid range
             data["score"] = max(0, min(100, int(data["score"])))
 
             return data
@@ -300,6 +273,7 @@ Be honest and rigorous in your scoring. A score of 60+ indicates a good match wo
             logger.error(f"Failed to parse scoring response: {e}")
             logger.debug(f"Response text: {response_text}")
 
+            # Return default low score
             return {
                 "score": 0,
                 "reasoning": "Failed to parse matching score",
@@ -307,7 +281,7 @@ Be honest and rigorous in your scoring. A score of 60+ indicates a good match wo
                 "concerns": ["Unable to analyze match quality"],
             }
 
-    def answer_question(
+    def answer_application_question(
         self,
         question: str,
         context: Optional[str] = None,
@@ -321,36 +295,15 @@ Be honest and rigorous in your scoring. A score of 60+ indicates a good match wo
         Returns:
             Generated answer
         """
-        if not self.is_available:
-            return ""
-
         logger.info(f"Generating answer for question: {question[:50]}...")
 
-        profile_summary = self.profile.to_text_summary()
-
-        prompt = f"""You are helping a candidate answer a job application question. Provide a concise, professional answer based on their background.
-
-CANDIDATE BACKGROUND:
-{profile_summary}
-
-APPLICATION QUESTION:
-{question}
-
-{f'ADDITIONAL CONTEXT: {context}' if context else ''}
-
-Provide a concise, professional answer (2-4 sentences) that:
-- Draws from actual experience and skills in the candidate's background
-- Is honest and authentic
-- Is specific and avoids generic platitudes
-
-Return ONLY the answer text, without any preamble or explanation.
-"""
+        prompt = self._build_question_prompt(question, context)
 
         try:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=500,
-                temperature=0.7,
+                temperature=0.7,  # Slightly higher for more natural responses
                 messages=[
                     {
                         "role": "user",
@@ -364,6 +317,82 @@ Return ONLY the answer text, without any preamble or explanation.
 
             return answer
 
-        except Exception as e:
-            logger.error(f"Error generating answer: {e}")
+        except AuthenticationError:
+            logger.error("Authentication error - check API key")
+            raise  # Re-raise auth errors
+        except RateLimitError as e:
+            logger.warning(f"Rate limit hit generating answer: {e}")
+            return ""  # Return empty, caller should handle fallback
+        except APIError as e:
+            logger.error(f"API error generating answer: {e}")
             return ""
+        except Exception as e:
+            logger.error(f"Unexpected error generating answer: {e}")
+            return ""
+
+    def _build_question_prompt(self, question: str, context: Optional[str]) -> str:
+        """Build prompt for answering application questions.
+
+        Args:
+            question: The question to answer
+            context: Additional context
+
+        Returns:
+            Formatted prompt
+        """
+        profile_summary = self.profile.get_summary_text()
+
+        prompt = f"""You are helping a candidate answer a job application question. Provide a concise, professional answer based on their background.
+
+CANDIDATE BACKGROUND:
+{profile_summary}
+
+APPLICATION QUESTION:
+{question}
+
+{f'ADDITIONAL CONTEXT:\n{context}\n' if context else ''}
+
+Provide a concise, professional answer (2-4 sentences) that:
+- Draws from actual experience and skills in the candidate's background
+- Is honest and authentic
+- Matches the professional tone appropriate for Chief of Staff / Business Operations roles
+- Is specific and avoids generic platitudes
+
+Return ONLY the answer text, without any preamble or explanation.
+"""
+        return prompt
+
+    def match_job(self, job: Job) -> tuple[Job, bool]:
+        """Complete matching pipeline for a job.
+
+        Args:
+            job: Job to match
+
+        Returns:
+            Tuple of (updated Job, matched boolean)
+        """
+        # Step 1: Keyword filter
+        if not self.keyword_filter(job):
+            job.status = JobStatus.REJECTED
+            logger.debug(f"Job rejected by keyword filter: {job.title}")
+            return job, False
+
+        job.status = JobStatus.FILTERED
+
+        # Step 2: LLM scoring
+        match_result = self.score_job_match(job)
+
+        # Update job with match results
+        job.match_score = match_result.score
+        job.match_reasoning = match_result.reasoning
+        job.key_matches = match_result.key_matches
+        job.concerns = match_result.concerns
+
+        if match_result.is_match:
+            job.status = JobStatus.MATCHED
+            logger.info(f"[MATCHED] {job.title} at {job.company} (score: {match_result.score})")
+            return job, True
+        else:
+            job.status = JobStatus.REJECTED
+            logger.info(f"[REJECTED] {job.title} at {job.company} (score: {match_result.score})")
+            return job, False

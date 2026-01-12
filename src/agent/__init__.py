@@ -1,4 +1,4 @@
-"""Agent module for job matching and application automation."""
+"""Agent modules for job hunting automation."""
 
 from .job_matcher import JobMatcher, MatchResult
 
