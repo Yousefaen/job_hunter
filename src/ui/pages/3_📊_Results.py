@@ -9,7 +9,7 @@ import os
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from src.models.job import Job, JobMatch
+from src.models.job import Job, JobMatch, JobStatus
 from src.models.search_criteria import SearchCriteria
 
 st.set_page_config(page_title="Results - Job Hunter", page_icon="📊", layout="wide")
@@ -38,46 +38,120 @@ def get_score_color(score: int) -> str:
         return "🔴"
 
 
-def generate_mock_justification(job: Job, profile) -> tuple[str, list, list]:
-    """Generate a mock justification for demo purposes."""
-    if not profile:
-        return "No profile uploaded for matching.", [], []
+def get_job_matcher():
+    """Get JobMatcher instance if API key is available."""
+    profile = st.session_state.get("profile")
+    api_key = os.getenv("ANTHROPIC_API_KEY") or st.session_state.get("anthropic_api_key")
 
+    if not profile:
+        return None, "No profile uploaded. Go to Resume page first."
+    if not api_key:
+        return None, "No API key. Set ANTHROPIC_API_KEY or enter in sidebar."
+
+    try:
+        from src.agent.job_matcher import JobMatcher
+        matcher = JobMatcher(profile=profile, criteria=criteria, api_key=api_key)
+        return matcher, None
+    except Exception as e:
+        return None, str(e)
+
+
+def match_job_with_ai(job: Job) -> JobMatch:
+    """Match a job using AI if available, otherwise use simple matching."""
+    profile = st.session_state.get("profile")
+    matcher, error = get_job_matcher()
+
+    if matcher:
+        try:
+            result = matcher.score_job_match(job)
+            return JobMatch(
+                job=job,
+                score=result.score,
+                justification=result.reasoning,
+                matched_skills=result.key_matches,
+                concerns=result.concerns,
+            )
+        except Exception as e:
+            st.warning(f"AI matching failed: {e}. Using basic matching.")
+
+    # Fallback to basic matching
+    return basic_match(job, profile)
+
+
+def basic_match(job: Job, profile) -> JobMatch:
+    """Basic keyword matching without AI."""
+    if not profile:
+        return JobMatch(job=job, score=50, justification="No profile for matching")
+
+    score = 50
     matched = []
     concerns = []
 
-    # Check title match
-    title_lower = job.title.lower()
-    for exp in profile.work_experience:
-        if any(word in exp.title.lower() for word in ["chief", "staff", "operations", "director"]):
-            matched.append(f"Your '{exp.title}' experience aligns with this role")
-            break
+    job_text = f"{job.title} {job.description}".lower()
 
     # Check skills
-    job_desc_lower = job.description.lower()
-    for skill in profile.skills[:5]:
-        if skill.lower() in job_desc_lower:
-            matched.append(f"Skill match: {skill}")
+    for skill in profile.skills[:10]:
+        if skill.lower() in job_text:
+            score += 5
+            matched.append(f"Skill: {skill}")
 
-    if not matched:
-        matched.append("General operations/leadership background")
+    # Check title alignment
+    title_keywords = ["chief", "staff", "operations", "bizops", "director"]
+    for kw in title_keywords:
+        if kw in job.title.lower():
+            score += 10
+            matched.append(f"Title match: {kw}")
+            break
 
-    # Add concerns based on job
-    if "5+ years" in job.description or "7+ years" in job.description:
-        concerns.append("May require more years of experience than shown")
-    if job.company_size and "201" in job.company_size:
-        concerns.append("Company may be larger than target (Seed-Series A)")
+    # Check company size
+    if job.company_size:
+        size_text = job.company_size.lower()
+        if any(s in size_text for s in ["1-10", "11-50", "51-200"]):
+            score += 10
+            matched.append("Startup size company")
+        elif "500" in size_text or "1000" in size_text:
+            concerns.append("Large company - may not be startup")
 
-    justification = f"Based on your profile, this {job.title} role at {job.company} "
-    if len(matched) > 1:
-        justification += f"shows {len(matched)} key alignments with your background. "
+    score = min(100, score)
+
+    justification = f"Basic matching found {len(matched)} alignment points. "
+    if score >= 70:
+        justification += "Good potential fit based on keywords."
+    elif score >= 50:
+        justification += "Moderate fit - review job details."
     else:
-        justification += "shows potential alignment with your background. "
+        justification += "Limited keyword matches."
 
-    if job.location.lower() == "remote" or "remote" in job.location.lower():
-        justification += "The remote option provides flexibility. "
+    return JobMatch(
+        job=job,
+        score=score,
+        justification=justification,
+        matched_skills=matched,
+        concerns=concerns,
+    )
 
-    return justification, matched, concerns
+
+# Sidebar: API Key configuration
+with st.sidebar:
+    st.markdown("### 🔑 AI Matching")
+
+    has_env_key = bool(os.getenv("ANTHROPIC_API_KEY"))
+    has_session_key = bool(st.session_state.get("anthropic_api_key"))
+
+    if has_env_key:
+        st.success("✅ API key from environment")
+    elif has_session_key:
+        st.success("✅ API key configured")
+    else:
+        st.warning("⚠️ No API key - using basic matching")
+        api_key_input = st.text_input(
+            "Anthropic API Key",
+            type="password",
+            help="Enter your Anthropic API key for AI-powered matching"
+        )
+        if api_key_input:
+            st.session_state.anthropic_api_key = api_key_input
+            st.rerun()
 
 
 # Toolbar
@@ -86,7 +160,7 @@ col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
 with col1:
     sort_by = st.selectbox(
         "Sort by",
-        ["Match Score (High to Low)", "Match Score (Low to High)", "Company Name", "Date Posted"],
+        ["Match Score (High to Low)", "Match Score (Low to High)", "Company Name"],
         label_visibility="collapsed"
     )
 
@@ -105,14 +179,66 @@ with col3:
     )
 
 with col4:
-    if st.button("🔄 Refresh Scores", use_container_width=True):
-        st.info("Re-scoring jobs with AI... (demo)")
+    if st.button("🔄 Re-score All", use_container_width=True):
+        if st.session_state.matched_jobs:
+            with st.spinner("Re-scoring jobs with AI..."):
+                new_matches = []
+                for jm in st.session_state.matched_jobs:
+                    new_match = match_job_with_ai(jm.job)
+                    new_matches.append(new_match)
+                st.session_state.matched_jobs = new_matches
+            st.success("✅ Re-scored all jobs!")
+            st.rerun()
 
 st.markdown("---")
 
-# Add sample jobs section (for demo)
-with st.expander("➕ Add Sample Jobs (Demo Mode)", expanded=not st.session_state.matched_jobs):
-    st.markdown("Add sample jobs to test the interface. In production, jobs come from LinkedIn search.")
+# Add job manually
+with st.expander("➕ Add Job Manually", expanded=not st.session_state.matched_jobs):
+    st.markdown("Paste a job posting to analyze and score it.")
+
+    add_col1, add_col2 = st.columns(2)
+
+    with add_col1:
+        job_title = st.text_input("Job Title", placeholder="Chief of Staff")
+        job_company = st.text_input("Company", placeholder="TechStartup Inc.")
+        job_location = st.text_input("Location", placeholder="New York, NY or Remote")
+
+    with add_col2:
+        job_company_size = st.text_input("Company Size", placeholder="50 employees")
+        job_url = st.text_input("LinkedIn URL (optional)", placeholder="https://linkedin.com/jobs/view/...")
+        job_easy_apply = st.checkbox("Easy Apply Available", value=True)
+
+    job_description = st.text_area(
+        "Job Description",
+        height=200,
+        placeholder="Paste the full job description here..."
+    )
+
+    if st.button("🎯 Analyze & Score Job", use_container_width=True, type="primary"):
+        if job_title and job_company and job_description:
+            job = Job(
+                linkedin_job_id=str(uuid.uuid4())[:8],
+                title=job_title,
+                company=job_company,
+                location=job_location or "Not specified",
+                description=job_description,
+                company_size=job_company_size,
+                easy_apply=job_easy_apply,
+                application_url=job_url if job_url else None,
+            )
+
+            with st.spinner("Analyzing job with AI..."):
+                job_match = match_job_with_ai(job)
+
+            st.session_state.matched_jobs.append(job_match)
+            st.success(f"✅ Added job: {job_title} (Score: {job_match.score})")
+            st.rerun()
+        else:
+            st.error("Please fill in Title, Company, and Description")
+
+# Sample jobs section
+with st.expander("📥 Load Sample Jobs"):
+    st.markdown("Load sample jobs to test the interface.")
 
     sample_jobs = [
         {
@@ -122,7 +248,6 @@ with st.expander("➕ Add Sample Jobs (Demo Mode)", expanded=not st.session_stat
             "company_size": "25 employees",
             "description": "We're looking for a Chief of Staff to work directly with the CEO. You'll drive strategic initiatives, manage cross-functional projects, and help scale our Series A startup. Requires 3+ years of operations experience, strong analytical skills, and MBA preferred.",
             "easy_apply": True,
-            "score": 92
         },
         {
             "title": "Head of Business Operations",
@@ -131,7 +256,6 @@ with st.expander("➕ Add Sample Jobs (Demo Mode)", expanded=not st.session_stat
             "company_size": "85 employees",
             "description": "Join our growing healthcare AI company as Head of Business Operations. Lead operational excellence, build scalable processes, and drive growth initiatives. Looking for someone with startup experience, data-driven mindset, and leadership skills.",
             "easy_apply": True,
-            "score": 85
         },
         {
             "title": "Director of Operations",
@@ -140,61 +264,25 @@ with st.expander("➕ Add Sample Jobs (Demo Mode)", expanded=not st.session_stat
             "company_size": "45 employees",
             "description": "Director of Operations needed for our fintech startup. You'll oversee daily operations, manage vendor relationships, and implement operational strategies. 5+ years experience required. Strong background in finance preferred.",
             "easy_apply": True,
-            "score": 78
         },
-        {
-            "title": "BizOps Lead",
-            "company": "CloudScale",
-            "location": "Remote",
-            "company_size": "120 employees",
-            "description": "BizOps Lead to drive business operations and analytics. Work with leadership on strategic planning, KPI tracking, and process improvement. Series B startup looking for analytical, data-driven operators.",
-            "easy_apply": False,
-            "score": 72
-        },
-        {
-            "title": "Operations Manager",
-            "company": "RetailTech",
-            "location": "Austin, TX",
-            "company_size": "200 employees",
-            "description": "Operations Manager for retail technology company. Manage supply chain, logistics, and operational efficiency. Looking for someone with retail or e-commerce experience.",
-            "easy_apply": True,
-            "score": 55
-        }
     ]
 
-    if st.button("📥 Load Sample Jobs", use_container_width=True):
-        profile = st.session_state.get("profile")
-
-        for sample in sample_jobs:
-            job = Job(
-                id=str(uuid.uuid4()),
-                title=sample["title"],
-                company=sample["company"],
-                location=sample["location"],
-                company_size=sample["company_size"],
-                description=sample["description"],
-                easy_apply=sample["easy_apply"],
-                remote="remote" in sample["location"].lower(),
-                posted_date="2 days ago",
-                url=f"https://linkedin.com/jobs/view/{uuid.uuid4().hex[:8]}"
-            )
-
-            justification, matched, concerns = generate_mock_justification(job, profile)
-
-            job_match = JobMatch(
-                job=job,
-                score=sample["score"],
-                justification=justification,
-                matched_skills=matched,
-                concerns=concerns
-            )
-
-            # Check if already exists
-            existing_ids = [m.job.id for m in st.session_state.matched_jobs]
-            if job.id not in existing_ids:
+    if st.button("📥 Load & Score Sample Jobs", use_container_width=True):
+        with st.spinner("Loading and scoring sample jobs..."):
+            for sample in sample_jobs:
+                job = Job(
+                    linkedin_job_id=str(uuid.uuid4())[:8],
+                    title=sample["title"],
+                    company=sample["company"],
+                    location=sample["location"],
+                    company_size=sample["company_size"],
+                    description=sample["description"],
+                    easy_apply=sample["easy_apply"],
+                )
+                job_match = match_job_with_ai(job)
                 st.session_state.matched_jobs.append(job_match)
 
-        st.success(f"✅ Loaded {len(sample_jobs)} sample jobs!")
+        st.success(f"✅ Loaded {len(sample_jobs)} jobs!")
         st.rerun()
 
 # Stats bar
@@ -213,7 +301,7 @@ if st.session_state.matched_jobs:
 
 # Job list
 if not st.session_state.matched_jobs:
-    st.info("No jobs loaded yet. Add sample jobs above or run a search from the Search page.")
+    st.info("No jobs yet. Add a job manually above or load sample jobs to get started.")
 else:
     # Apply filters
     filtered_jobs = st.session_state.matched_jobs.copy()
@@ -241,15 +329,20 @@ else:
         filtered_jobs.sort(key=lambda x: x.job.company)
 
     # Bulk actions
-    action_col1, action_col2, action_col3 = st.columns([1, 1, 2])
+    action_col1, action_col2, action_col3, action_col4 = st.columns([1, 1, 1, 1])
     with action_col1:
-        if st.button("☑️ Select All Above Threshold"):
+        if st.button("☑️ Select Above Threshold"):
             for jm in filtered_jobs:
                 if jm.score >= criteria.min_match_score:
-                    st.session_state.selected_jobs.add(jm.job.id)
+                    st.session_state.selected_jobs.add(jm.job.linkedin_job_id)
             st.rerun()
     with action_col2:
         if st.button("☐ Deselect All"):
+            st.session_state.selected_jobs.clear()
+            st.rerun()
+    with action_col3:
+        if st.button("🗑️ Clear All Jobs"):
+            st.session_state.matched_jobs = []
             st.session_state.selected_jobs.clear()
             st.rerun()
 
@@ -259,35 +352,32 @@ else:
     for job_match in filtered_jobs:
         job = job_match.job
         score = job_match.score
-        is_selected = job.id in st.session_state.selected_jobs
+        job_id = job.linkedin_job_id
+        is_selected = job_id in st.session_state.selected_jobs
 
         # Job card
         with st.container():
             header_col1, header_col2, header_col3 = st.columns([0.5, 6, 1.5])
 
             with header_col1:
-                # Checkbox for selection
                 selected = st.checkbox(
                     "Select",
                     value=is_selected,
-                    key=f"select_{job.id}",
+                    key=f"select_{job_id}",
                     label_visibility="collapsed"
                 )
-                if selected and job.id not in st.session_state.selected_jobs:
-                    st.session_state.selected_jobs.add(job.id)
-                elif not selected and job.id in st.session_state.selected_jobs:
-                    st.session_state.selected_jobs.remove(job.id)
+                if selected and job_id not in st.session_state.selected_jobs:
+                    st.session_state.selected_jobs.add(job_id)
+                elif not selected and job_id in st.session_state.selected_jobs:
+                    st.session_state.selected_jobs.remove(job_id)
 
             with header_col2:
                 st.markdown(f"### {job.title}")
                 meta_parts = [f"**{job.company}**", job.location]
                 if job.company_size:
                     meta_parts.append(job.company_size)
-                if job.posted_date:
-                    meta_parts.append(f"Posted {job.posted_date}")
                 st.markdown(" • ".join(meta_parts))
 
-                # Badges
                 badges = []
                 if job.easy_apply:
                     badges.append("⚡ Easy Apply")
@@ -297,7 +387,6 @@ else:
                     st.markdown(" | ".join(badges))
 
             with header_col3:
-                # Score display
                 color = get_score_color(score)
                 st.markdown(f"### {color} {score}")
                 st.caption("Match Score")
@@ -318,10 +407,11 @@ else:
                         st.markdown(f"• {concern}")
 
                 st.markdown("**Job Description:**")
-                st.markdown(job.description[:500] + "..." if len(job.description) > 500 else job.description)
+                desc = job.description or ""
+                st.markdown(desc[:500] + "..." if len(desc) > 500 else desc)
 
-                if job.url:
-                    st.markdown(f"[🔗 View on LinkedIn]({job.url})")
+                if job.application_url:
+                    st.markdown(f"[🔗 View on LinkedIn]({job.application_url})")
 
             st.markdown("---")
 
@@ -341,7 +431,7 @@ else:
 
         with apply_col2:
             above_threshold_ids = [
-                jm.job.id for jm in st.session_state.matched_jobs
+                jm.job.linkedin_job_id for jm in st.session_state.matched_jobs
                 if jm.score >= criteria.min_match_score and jm.job.easy_apply
             ]
             if st.button(

@@ -61,3 +61,26 @@ class Job(BaseModel):
     model_config = ConfigDict(
         ser_json_timedelta="iso8601",
     )
+
+    def is_remote(self) -> bool:
+        """Check if job is remote."""
+        return "remote" in self.location.lower() if self.location else False
+
+
+class JobMatch(BaseModel):
+    """A job with its match score and justification."""
+
+    job: Job
+    score: int = Field(ge=0, le=100)
+    justification: str = ""
+    matched_skills: list[str] = Field(default_factory=list)
+    concerns: list[str] = Field(default_factory=list)
+
+    @property
+    def score_category(self) -> str:
+        """Get score category."""
+        if self.score >= 80:
+            return "excellent"
+        elif self.score >= 60:
+            return "good"
+        return "poor"
