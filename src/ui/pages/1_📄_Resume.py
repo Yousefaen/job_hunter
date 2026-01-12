@@ -14,6 +14,10 @@ from src.resume.profile import UserProfile, ContactInfo, WorkExperience, Educati
 
 st.set_page_config(page_title="Resume - Job Hunter", page_icon="📄", layout="wide")
 
+# Initialize session state
+if "profile" not in st.session_state:
+    st.session_state.profile = None
+
 st.title("📄 Resume Management")
 st.markdown("Upload your resume or create a profile manually.")
 
