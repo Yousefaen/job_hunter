@@ -246,16 +246,238 @@ with preview_col2:
         st.markdown(f"**Excluded Keywords:** {len(excl_kws)}")
         st.markdown(f"**Min Match Score:** {min_score}%")
 
-# Search button (placeholder for future functionality)
+# Search functionality
 st.markdown("---")
-st.markdown("### Ready to Search?")
+st.markdown("### 🚀 Run Job Search")
 
 if not st.session_state.get("profile"):
     st.warning("⚠️ Please upload a resume first before searching for jobs.")
     st.page_link("pages/1_📄_Resume.py", label="Go to Resume Page")
 else:
-    st.info(
-        "🔍 **Coming Soon**: Live job search integration with LinkedIn. "
-        "For now, you can add sample jobs in the Results page to test the matching flow."
-    )
-    st.page_link("pages/3_📊_Results.py", label="Go to Results Page")
+    st.success("✅ Resume loaded. Ready to search!")
+
+    # Initialize jobs list in session state
+    if "found_jobs" not in st.session_state:
+        st.session_state.found_jobs = []
+    if "search_running" not in st.session_state:
+        st.session_state.search_running = False
+
+    # Search settings
+    search_col1, search_col2 = st.columns(2)
+
+    with search_col1:
+        max_results = st.number_input(
+            "Maximum Jobs to Find",
+            min_value=5,
+            max_value=100,
+            value=25,
+            step=5,
+            help="Limit the number of jobs to search for"
+        )
+
+    with search_col2:
+        headless_mode = st.checkbox(
+            "Run in Background (Headless)",
+            value=False,
+            help="Run browser without visible window (faster but can't see progress)"
+        )
+
+    # LinkedIn credentials check
+    import os
+    has_credentials = bool(os.getenv("LINKEDIN_EMAIL") and os.getenv("LINKEDIN_PASSWORD"))
+
+    if not has_credentials:
+        st.warning(
+            "⚠️ LinkedIn credentials not found. Set `LINKEDIN_EMAIL` and `LINKEDIN_PASSWORD` "
+            "environment variables, or the browser will open for manual login."
+        )
+
+    # Search button
+    btn_col1, btn_col2 = st.columns(2)
+
+    with btn_col1:
+        search_clicked = st.button(
+            "🔍 Start LinkedIn Search",
+            use_container_width=True,
+            type="primary",
+            disabled=st.session_state.search_running
+        )
+
+    with btn_col2:
+        if st.session_state.found_jobs:
+            st.button(
+                f"📊 View {len(st.session_state.found_jobs)} Found Jobs",
+                use_container_width=True,
+                on_click=lambda: st.switch_page("pages/3_📊_Results.py")
+            )
+
+    if search_clicked:
+        st.session_state.search_running = True
+
+        # Import browser automation
+        try:
+            from src.browser.linkedin_browser import LinkedInBrowser
+            from src.browser.login import LinkedInAuth
+            from src.agent.job_searcher import JobSearcher
+        except ImportError as e:
+            st.error(f"❌ Failed to import browser modules: {e}")
+            st.info("Make sure Playwright is installed: `pip install playwright && playwright install chromium`")
+            st.session_state.search_running = False
+            st.stop()
+
+        progress_bar = st.progress(0, text="Initializing browser...")
+        status_text = st.empty()
+        job_counter = st.empty()
+
+        found_jobs = []
+
+        try:
+            # Start browser
+            status_text.info("🌐 Starting browser...")
+            browser = LinkedInBrowser(headless=headless_mode)
+            page = browser.start()
+
+            progress_bar.progress(10, text="Browser started")
+
+            # Try to load saved cookies
+            browser.load_cookies()
+
+            # Login to LinkedIn
+            status_text.info("🔐 Logging into LinkedIn...")
+            auth = LinkedInAuth(page)
+
+            if not auth.ensure_logged_in():
+                status_text.warning(
+                    "⚠️ Please log in to LinkedIn in the browser window. "
+                    "Waiting for login..."
+                )
+                # Wait for manual login
+                import time
+                for i in range(120):  # Wait up to 2 minutes
+                    time.sleep(1)
+                    if auth.is_logged_in():
+                        break
+
+                if not auth.is_logged_in():
+                    st.error("❌ LinkedIn login timeout. Please try again.")
+                    browser.close()
+                    st.session_state.search_running = False
+                    st.stop()
+
+            # Save cookies for next time
+            browser.save_cookies()
+
+            progress_bar.progress(20, text="Logged into LinkedIn")
+            status_text.success("✅ Logged into LinkedIn")
+
+            # Create job searcher
+            searcher = JobSearcher(
+                page=page,
+                criteria=st.session_state.search_criteria,
+                min_delay=2.0,
+                max_delay=5.0
+            )
+
+            # Run search
+            status_text.info("🔍 Searching for jobs...")
+
+            total_titles = len(st.session_state.search_criteria.titles)
+            total_locations = len(st.session_state.search_criteria.locations)
+            total_searches = total_titles * total_locations
+            search_num = 0
+
+            for title in st.session_state.search_criteria.titles:
+                for location in st.session_state.search_criteria.locations:
+                    if len(found_jobs) >= max_results:
+                        break
+
+                    search_num += 1
+                    progress = 20 + int((search_num / total_searches) * 60)
+                    progress_bar.progress(
+                        progress,
+                        text=f"Searching: {title} in {location}"
+                    )
+                    status_text.info(f"🔍 Searching: {title} in {location}")
+
+                    # Build and navigate to search URL
+                    search_url = searcher.build_search_url(title, location)
+                    page.goto(search_url, timeout=30000)
+
+                    import time
+                    time.sleep(3)  # Wait for results to load
+
+                    # Extract jobs from page
+                    jobs = searcher._extract_jobs_from_page()
+
+                    for job in jobs:
+                        if len(found_jobs) >= max_results:
+                            break
+
+                        # Check if we already have this job
+                        if any(j.id == job.id for j in found_jobs):
+                            continue
+
+                        # Apply basic filters
+                        if searcher._passes_basic_filters(job):
+                            found_jobs.append(job)
+                            job_counter.metric("Jobs Found", len(found_jobs))
+
+                    # Random delay between searches
+                    time.sleep(2 + (3 * (search_num % 3)))
+
+            # Get details for found jobs
+            progress_bar.progress(80, text="Fetching job details...")
+            status_text.info("📝 Fetching job details...")
+
+            detailed_jobs = []
+            for i, job in enumerate(found_jobs[:max_results]):
+                progress = 80 + int((i / len(found_jobs)) * 15)
+                progress_bar.progress(progress, text=f"Getting details for job {i+1}/{len(found_jobs)}")
+
+                try:
+                    detailed_job = searcher.get_job_details(job)
+                    detailed_jobs.append(detailed_job)
+                except Exception as e:
+                    detailed_jobs.append(job)  # Keep without details
+
+                import time
+                time.sleep(2)  # Delay between detail fetches
+
+            # Close browser
+            browser.close()
+
+            # Store results
+            st.session_state.found_jobs = detailed_jobs
+
+            progress_bar.progress(100, text="Search complete!")
+            status_text.success(f"✅ Found {len(detailed_jobs)} jobs!")
+
+            if detailed_jobs:
+                st.balloons()
+                st.success(f"🎉 Found {len(detailed_jobs)} jobs! Go to Results page to view and match them.")
+                st.page_link("pages/3_📊_Results.py", label="📊 Go to Results Page")
+            else:
+                st.warning("No jobs found matching your criteria. Try adjusting your search.")
+
+        except Exception as e:
+            st.error(f"❌ Search failed: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+
+        finally:
+            st.session_state.search_running = False
+
+    # Show previously found jobs
+    if st.session_state.found_jobs and not st.session_state.search_running:
+        st.markdown("---")
+        st.markdown(f"### 📋 Previously Found Jobs ({len(st.session_state.found_jobs)})")
+
+        for job in st.session_state.found_jobs[:10]:
+            with st.expander(f"{job.title} at {job.company}"):
+                st.markdown(f"**Location:** {job.location}")
+                st.markdown(f"**Easy Apply:** {'✅' if job.easy_apply else '❌'}")
+                if job.description:
+                    st.markdown(f"**Description:** {job.description[:500]}...")
+
+        if len(st.session_state.found_jobs) > 10:
+            st.caption(f"... and {len(st.session_state.found_jobs) - 10} more. View all on Results page.")
