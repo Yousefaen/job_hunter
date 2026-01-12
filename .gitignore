@@ -43,6 +43,9 @@ htmlcov/
 .env
 .env.local
 
+# Streamlit secrets
+.streamlit/secrets.toml
+
 # Data
 data/resumes/*.pdf
 data/resumes/*.json
