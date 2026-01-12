@@ -22,11 +22,11 @@ wheels/
 
 # Virtual environments
 venv/
-env/
 ENV/
+env/
 .venv
 
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
@@ -39,24 +39,31 @@ ENV/
 htmlcov/
 .tox/
 
-# Environment variables
+# Environment variables and secrets
 .env
 .env.local
 
-# Streamlit secrets
-.streamlit/secrets.toml
-
-# Data
-data/resumes/*.pdf
-data/resumes/*.json
-!data/resumes/profile_template.json
-!data/resumes/README.md
+# Database
 *.db
-*.db-journal
+*.sqlite
+*.sqlite3
+data/job_hunter.db
+
+# Resumes (user data)
+data/resumes/*.pdf
 
 # Logs
 *.log
+logs/
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Playwright
+.playwright/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
