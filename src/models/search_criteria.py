@@ -34,6 +34,9 @@ class SearchCriteria(BaseModel):
         default_factory=lambda: ["Israel"]
     )
 
+    # Excluded companies
+    excluded_companies: list[str] = Field(default_factory=list)
+
     # Experience level
     experience_levels: list[str] = Field(
         default_factory=lambda: [
@@ -83,3 +86,8 @@ class SearchCriteria(BaseModel):
                 f"must be >= min_delay_between_applications ({self.min_delay_between_applications})"
             )
         return self
+
+    def is_company_excluded(self, company: str) -> bool:
+        """Check if a company is in the exclusion list."""
+        company_lower = company.lower()
+        return any(exc.lower() in company_lower for exc in self.excluded_companies)
