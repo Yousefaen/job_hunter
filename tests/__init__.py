@@ -1,1 +1,1 @@
-"""Tests for the LinkedIn Job Application Agent."""
+"""Tests for browser automation module."""

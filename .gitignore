@@ -24,11 +24,11 @@ wheels/
 venv/
 ENV/
 env/
-.venv
+.venv/
 
-# IDEs
-.vscode/
+# IDE
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
@@ -38,32 +38,29 @@ env/
 .coverage
 htmlcov/
 .tox/
+.nox/
 
-# Environment variables and secrets
+# Environment
 .env
 .env.local
+*.env
+
+# Session data (contains sensitive cookies)
+data/sessions/
+*.cookies.json
+
+# Screenshots (debug output)
+data/screenshots/
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
-data/job_hunter.db
-
-# Resumes (user data)
-data/resumes/*.pdf
 
 # Logs
 *.log
 logs/
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
-
-# Playwright
-.playwright/
-
-# MyPy
-.mypy_cache/
-.dmypy.json
-dmypy.json
